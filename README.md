@@ -32,83 +32,79 @@ pip install boto3 azure-cognitiveservices-speech google-cloud-speech ibm-watson 
 
 ## Dataset Preparation
 
-### In Kaggle
+### Using Kaggle (Recommended)
 
-1. Load the MasriSpeech dataset and add translations:
+The easiest way to prepare the MasriSpeech dataset is using the provided Kaggle notebook workflow:
+
+1. **Load the dataset and add translations:**
 
 ```python
-from datasets import load_dataset, Audio
+from datasets import load_dataset, Audio, Value
 import pandas as pd
 
 # Load dataset
 dataset = load_dataset("NightPrince/MasriSpeech-Full")
-
-# Cast audio to not decode during operations
-dataset["validation"] = dataset["validation"].cast_column("audio", Audio(decode=False))
 
 # Load translations CSV
 csv_path = "/kaggle/input/translated/Translate - 1 (3).csv"
 df = pd.read_csv(csv_path, encoding="utf-8-sig")
 translations = df.iloc[:, 1].tolist()
 
-# Add translation column
-# (See talsem.ipynb for complete code)
+# Add translation column to train split
+new_feats = dataset["train"].features.copy()
+new_feats["translation"] = Value("string")
+
+def add_translation(batch, indices):
+    return {"translation": [translations[i] for i in indices]}
+
+dataset["train"] = dataset["train"].map(
+    add_translation,
+    with_indices=True,
+    batched=True,
+    features=new_feats,
+    desc="Adding translation column"
+)
+
+# Cast audio to not decode (returns bytes for efficient processing)
+dataset["train"] = dataset["train"].cast_column("audio", Audio(decode=False))
 ```
 
-2. Export to CSV format:
+2. **Export using the helper script:**
 
 ```python
-import os
-import csv
-import soundfile
-import scipy.signal as signal
+from export_masrispeech_kaggle import export_masrispeech_to_csv
 
-output_folder = "./masrispeech_benchmark"
-audio_folder = os.path.join(output_folder, "audio")
-os.makedirs(output_folder, exist_ok=True)
-os.makedirs(audio_folder, exist_ok=True)
+# Export configuration
+OUTPUT_FOLDER = "./masrispeech_benchmark"
+AUDIO_FOLDER = "./masrispeech_benchmark/audio"
 
-metadata_path = os.path.join(output_folder, "metadata.csv")
+metadata_path, count = export_masrispeech_to_csv(
+    dataset=dataset,
+    output_folder=OUTPUT_FOLDER,
+    audio_folder=AUDIO_FOLDER,
+    split="train",
+    max_samples=100  # or None for all 50,715 samples
+)
 
-with open(metadata_path, "w", encoding="utf-8", newline="") as f:
-    writer = csv.DictWriter(f, fieldnames=["audio_path", "transcription", "translation"])
-    writer.writeheader()
-
-    for idx, example in enumerate(dataset["validation"]):
-        # Get audio
-        audio_data = example["audio"]
-        audio_array = audio_data["array"]
-        sample_rate = audio_data["sampling_rate"]
-
-        # Resample to 16kHz if needed
-        if sample_rate != 16000:
-            num_samples = int(len(audio_array) * 16000 / sample_rate)
-            audio_array = signal.resample(audio_array, num_samples)
-
-        # Convert to int16 and save
-        audio_int16 = (audio_array * 32767).astype("int16")
-        audio_filename = f"masrispeech_val_{idx:05d}.flac"
-        audio_path = os.path.join(audio_folder, audio_filename)
-        soundfile.write(audio_path, audio_int16, samplerate=16000)
-
-        # Write metadata
-        translation = example.get("translation")
-        if translation is None or (isinstance(translation, float) and pd.isna(translation)):
-            translation = ""  # Empty for missing translations
-
-        writer.writerow({
-            "audio_path": audio_path,
-            "transcription": example["transcription"],
-            "translation": translation
-        })
-
-        if (idx + 1) % 100 == 0:
-            print(f"Processed {idx + 1} examples...")
-
-print(f"Export complete! Files saved to {output_folder}")
+print(f"Exported {count} samples")
 ```
 
-3. Download the `masrispeech_benchmark` folder
+The export script automatically:
+- Decodes audio from bytes (handles torchcodec issues)
+- Resamples to 16kHz mono
+- Converts to int16 FLAC format
+- Saves **relative paths** in metadata.csv for portability
+- Handles missing translations gracefully
+
+3. **Clone this repository in Kaggle:**
+
+```python
+!git clone https://github.com/omar-A-hassan/Benchmark-Whisper.git
+```
+
+4. **Run benchmarks** (see Usage section below)
+
+**Note:** See `talsem.ipynb` for the complete Kaggle notebook workflow.
 
 ## Usage
 
@@ -190,8 +186,11 @@ BLEU: 28.45
 RTF: 0.52
 ```
 
-- **BLEU**: BLEU score, 0-100 (higher is better)
+- **BLEU**: n-gram error rate, 0-100 (lower is better)
   - Measures translation quality using n-gram overlap with reference
+  - Returns percentage of non-matching n-grams (1-4 grams)
+  - Lower values indicate better translation quality
+  - ~20-30% error rate is good for machine translation
 - **RTF**: Real-time Factor
 
 ## What Was Modified
@@ -239,6 +238,21 @@ RTF: 0.52
 ### 6. Benchmark Logic (`benchmark.py`)
 - Updated to use BLEU metric for translation datasets
 - Automatically selects appropriate metric based on dataset type
+- Uses English normalizer for translation tasks (target language)
+- Uses source language normalizer for transcription tasks
+- Fixed results log filename generation (uses `.value` instead of `str()`)
+
+### 7. Export Helper (`export_masrispeech_kaggle.py`)
+- Added helper script for exporting MasriSpeech dataset in Kaggle
+- Handles audio decoding from bytes (solves torchcodec issues)
+- Resamples audio to 16kHz mono
+- Saves relative paths for portability
+- Handles missing translations gracefully
+
+### 8. GPU Support (`engine.py`)
+- Auto-detects CUDA availability
+- Uses GPU when available for 5-10x speedup
+- Falls back to CPU automatically
 
 ## Dataset Format
 
@@ -256,13 +270,13 @@ masrispeech_benchmark/
 **metadata.csv format:**
 ```csv
 audio_path,transcription,translation
-audio/masrispeech_val_00000.flac,على إنها عار في الوقت...,It was a shame that she...
-audio/masrispeech_val_00001.flac,فأكيد ربنا عوضهم خير...,Surely God compensated them...
+audio/masrispeech_train_00000.flac,على إنها عار في الوقت...,It was a shame that she...
+audio/masrispeech_train_00001.flac,فأكيد ربنا عوضهم خير...,Surely God compensated them...
 ```
 
-- `audio_path`: Path to audio file (can be relative or absolute)
+- `audio_path`: Path to audio file (relative to metadata.csv folder - recommended)
 - `transcription`: Arabic transcription (required for MASRI_SPEECH)
-- `translation`: English translation (required for MASRI_SPEECH_TRANSLATE)
+- `translation`: English translation (required for MASRI_SPEECH_TRANSLATE, can be empty string if missing)
 
 ## Example: Complete Benchmark Run
 
@@ -316,15 +330,29 @@ done
   - Lower is better
   - 0% = perfect transcription
 
-- **BLEU Score**:
-  - Measures n-gram overlap between prediction and reference
-  - 0-100 scale (higher is better)
-  - 40+ is typically considered good for machine translation
+- **BLEU Metric** (as implemented):
+  - Returns n-gram **error rate**, not traditional BLEU score
+  - 0-100 scale (lower is better - opposite of traditional BLEU)
+  - Measures percentage of non-matching n-grams (1-4 grams)
+  - 20-30% error rate is good for machine translation
+  - Note: This differs from traditional BLEU scoring for consistency with WER format
 
 - **Model Size vs Performance**:
   - Tiny/Base: Fast but lower accuracy
   - Small/Medium: Balanced
   - Large/Large-v3: Highest accuracy but slower
+
+- **GPU Acceleration**:
+  - The framework automatically detects and uses GPU (CUDA) when available
+  - Falls back to CPU if GPU is not available
+  - GPU provides 5-10x speedup (RTF: ~0.1-0.3 vs 0.8-1.3 on CPU)
+  - Enable GPU in Kaggle: Runtime → Change runtime type → GPU T4
+  - Verify GPU usage:
+    ```python
+    import torch
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    ```
 
 ## Troubleshooting
 
