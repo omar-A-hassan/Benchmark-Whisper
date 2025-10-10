@@ -127,9 +127,12 @@ def export_masrispeech_to_csv(dataset, output_folder, audio_folder, split="valid
                 audio_path = os.path.join(audio_folder, audio_filename)
                 soundfile.write(audio_path, audio_int16, samplerate=16000)
 
+                # Store relative path from output_folder for portability
+                relative_audio_path = os.path.relpath(audio_path, output_folder)
+
                 # Prepare metadata row
                 row = {
-                    "audio_path": audio_path,
+                    "audio_path": relative_audio_path,
                     "transcription": example["transcription"]
                 }
 
