@@ -231,7 +231,7 @@ def main():
 
     rtf = sum(x.process_sec for x in results) / sum(x.audio_sec for x in results)
 
-    results_log_path = os.path.join(RESULTS_FOLDER, language.value, dataset_name.value, f"{str(engine_name)}.log")
+    results_log_path = os.path.join(RESULTS_FOLDER, language.value, dataset_name.value, f"{engine_name.value}.log")
     os.makedirs(os.path.dirname(results_log_path), exist_ok=True)
     with open(results_log_path, "w") as f:
         for metric_name, metric_results in metric_results.items():
