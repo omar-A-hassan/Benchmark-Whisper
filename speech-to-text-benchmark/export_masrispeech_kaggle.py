@@ -83,18 +83,24 @@ def export_masrispeech_to_csv(dataset, output_folder, audio_folder, split="valid
             try:
                 example = split_data[idx]
 
-                # Get audio data (should be decoded by librosa backend)
+                # Get audio data
                 audio_data = example["audio"]
 
-                # Verify we have decoded audio
-                if "array" not in audio_data or "sampling_rate" not in audio_data:
-                    print(f"\n⚠️  Warning: Audio at index {idx} is not decoded!")
+                # Check if audio is already decoded (has 'array') or needs decoding from bytes
+                if "array" in audio_data and audio_data["array"] is not None:
+                    # Already decoded
+                    audio_array = audio_data["array"]
+                    sample_rate = audio_data["sampling_rate"]
+                elif "bytes" in audio_data and audio_data["bytes"] is not None:
+                    # Decode from bytes using soundfile
+                    import io
+                    audio_bytes = audio_data["bytes"]
+                    audio_array, sample_rate = soundfile.read(io.BytesIO(audio_bytes))
+                else:
+                    print(f"\nWarning: Audio at index {idx} has no array or bytes!")
                     print(f"   Audio keys: {audio_data.keys()}")
                     skipped_count += 1
                     continue
-
-                audio_array = audio_data["array"]
-                sample_rate = audio_data["sampling_rate"]
 
                 # Ensure numpy array
                 if not isinstance(audio_array, np.ndarray):
@@ -141,16 +147,16 @@ def export_masrispeech_to_csv(dataset, output_folder, audio_folder, split="valid
                 exported_count += 1
 
             except Exception as e:
-                print(f"\n❌ Error processing index {idx}: {e}")
+                print(f"\nError processing index {idx}: {e}")
                 skipped_count += 1
                 continue
 
     # Summary
     print(f"\n{'='*60}")
     print(f"Export Summary:")
-    print(f"  ✓ Exported: {exported_count} samples")
+    print(f"Exported: {exported_count} samples")
     if skipped_count > 0:
-        print(f"  ⚠️  Skipped: {skipped_count} samples")
+        print(f" Skipped: {skipped_count} samples")
     print(f"  Metadata: {metadata_path}")
     print(f"  Audio files: {audio_folder}")
     print(f"{'='*60}")
