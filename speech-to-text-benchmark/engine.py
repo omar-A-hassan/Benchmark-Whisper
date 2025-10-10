@@ -992,7 +992,9 @@ class Whisper(Engine):
     }
 
     def __init__(self, cache_extension: str, model: str, language: Languages, task: str = "transcribe"):
-        self._model = whisper.load_model(model, device="cpu")
+        # Auto-detect GPU availability
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._model = whisper.load_model(model, device=device)
         self._cache_extension = cache_extension
         self._language_code = self.LANGUAGE_TO_WHISPER_CODE[language]
         self._task = task  # "transcribe" or "translate"
