@@ -180,49 +180,37 @@ class BLEUScore(Metric):
 
     def calculate(self, prediction: str, reference: str) -> Tuple[int, int]:
         """
-        Calculate BLEU score
-        Returns: (error_count, total_count) where error is scaled to match WER format
-        We return (100 - BLEU*100, 100) to make it compatible with error-based metrics
+        Calculate per-sample n-gram statistics for corpus-level BLEU
+        Returns: (matches_sum, pred_len) for aggregating across corpus
+
+        Note: This returns raw counts that should be aggregated across all samples
+        before computing final BLEU score. The benchmark.py will need special handling
+        for BLEU to compute corpus-level score from these counts.
+
+        For now, we return approximate per-sample metrics that can be averaged:
+        - numerator: sum of n-gram matches (scaled)
+        - denominator: total n-grams in prediction (scaled)
         """
         pred_tokens = prediction.split()
         ref_tokens = reference.split()
 
         if len(pred_tokens) == 0 or len(ref_tokens) == 0:
-            return 100, 100  # Maximum error if either is empty
+            return 0, 1  # No matches if either is empty
 
-        # Calculate precision for n-grams 1-4
-        precisions = []
+        # Calculate precision statistics for n-grams 1-4
+        total_matches = 0
+        total_ngrams = 0
+
         for n in range(1, 5):
-            if len(pred_tokens) >= n and len(ref_tokens) >= n:
+            if len(pred_tokens) >= n:
                 matches, total = self._calculate_precision(pred_tokens, ref_tokens, n)
-                if total > 0:
-                    precisions.append(matches / total)
-                else:
-                    precisions.append(0.0)
-            else:
-                precisions.append(0.0)
+                total_matches += matches
+                total_ngrams += total
 
-        # Calculate geometric mean of precisions
-        if all(p > 0 for p in precisions):
-            geo_mean = np.exp(np.mean([np.log(p) for p in precisions]))
-        else:
-            geo_mean = 0.0
-
-        # Apply brevity penalty
-        bp = self._brevity_penalty(len(pred_tokens), len(ref_tokens))
-        bleu = bp * geo_mean
-
-        # Convert BLEU (0-1) to error metric (0-100)
-        # Higher BLEU is better, so error = 100 - (BLEU * 100)
-        bleu_percent = bleu * 100
-        error = 100 - bleu_percent
-
-        # Return as integer counts for compatibility with benchmark framework
-        # We'll use a scale of 1000 to maintain precision
-        error_count = int(error * 10)
-        total_count = 1000
-
-        return error_count, total_count
+        # Return raw counts for aggregation
+        # The framework will sum these and compute: (1 - total_matches/total_ngrams) * 100
+        # This gives us an approximation of translation quality
+        return total_ngrams - total_matches, total_ngrams
 
 
 __all__ = [
