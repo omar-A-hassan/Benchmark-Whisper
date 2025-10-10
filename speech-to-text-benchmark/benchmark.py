@@ -53,7 +53,12 @@ def process(
         punctuation=punctuation,
         punctuation_set=punctuation_set,
     )
-    normalizer = Normalizer.create(language=language, keep_punctuation=punctuation, punctuation_set=punctuation_set)
+
+    # For translation tasks (BLEU metric), use English normalizer for output text
+    # For transcription tasks (WER/PER), use source language normalizer
+    is_translation = any(m == Metrics.BLEU for m in metric_names)
+    normalizer_language = Languages.EN if is_translation else language
+    normalizer = Normalizer.create(language=normalizer_language, keep_punctuation=punctuation, punctuation_set=punctuation_set)
 
     metrics = {m: Metric.create(m) for m in metric_names}
     results = {m: {"num_errors": 0, "num_tokens": 0} for m in metric_names}
