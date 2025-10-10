@@ -1,0 +1,17 @@
+amazon-transcribe==0.6.4
+azure-cognitiveservices-speech
+boto3
+editdistance
+google-cloud-speech==2.23.0
+huggingface-hub
+ibm_watson
+inflect
+matplotlib
+numpy
+openai-whisper
+psutil
+pvcheetah==2.3.0
+pvleopard==2.0.1
+pytube
+requests
+soundfile
