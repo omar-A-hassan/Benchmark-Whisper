@@ -20,14 +20,7 @@ The modifications support the MasriSpeech-Full dataset from HuggingFace.
 ### Requirements
 
 ```bash
-pip install torch whisper soundfile datasets scipy editdistance numpy inflect
-```
-
-### Optional Dependencies
-
-For using cloud-based engines (not needed for Whisper):
-```bash
-pip install boto3 azure-cognitiveservices-speech google-cloud-speech ibm-watson pvleopard pvcheetah
+pip install -r requirements.txt
 ```
 
 ## Dataset Preparation
