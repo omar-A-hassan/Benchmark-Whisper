@@ -171,6 +171,15 @@ RTF: 0.45
 - **WER**: Word Error Rate (lower is better)
 - **RTF**: Real-time Factor (processing time / audio duration)
 
+**Transcription Performance Comparison:**
+
+![Transcription Comparison](speech-to-text-benchmark/results/transcription_comparison.png)
+
+The chart shows Whisper Tiny vs Small on MasriSpeech dataset:
+- **Accuracy**: Small model achieves 34% lower WER (56.44% vs 85.97%)
+- **Speed**: Tiny is 7% faster but with significantly lower accuracy
+- **Trade-off**: Small model offers much better accuracy with minimal speed penalty
+
 ### Translation Results (BLEU)
 
 Example output for translation:
@@ -185,6 +194,15 @@ RTF: 0.52
   - Lower values indicate better translation quality
   - ~20-30% error rate is good for machine translation
 - **RTF**: Real-time Factor
+
+**Translation Performance Comparison:**
+
+![Translation Comparison](speech-to-text-benchmark/results/translation_comparison.png)
+
+The chart shows Whisper Tiny vs Small for Arabic→English translation:
+- **Accuracy**: Small model achieves 6% lower error rate (91.19 vs 97.11)
+- **Speed**: Tiny is 21% faster (RTF 0.218 vs 0.276)
+- **Trade-off**: Both models show high error rates on translation, but Small performs better
 
 ## What Was Modified
 
